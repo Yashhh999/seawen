@@ -27,6 +27,8 @@ def parse_args():
     parser.add_argument("--batch", type=int, default=int(os.environ.get("SEAWEN_BATCH", "1")))
     parser.add_argument("--grad-accum", type=int, default=int(os.environ.get("SEAWEN_GRAD_ACCUM", "16")))
     parser.add_argument("--output", default=os.environ.get("SEAWEN_OUTPUT", "/kaggle/working/seawen-adapter"))
+    parser.add_argument("--save-steps", type=int, default=int(os.environ.get("SEAWEN_SAVE_STEPS", "5")))
+    parser.add_argument("--hub-id", default=os.environ.get("SEAWEN_HUB_ID", "Yashhh999/seawen"))
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--dry-run", action="store_true", help="Build the mix and print two samples, then exit.")
     return parser.parse_known_args()[0]
@@ -59,23 +61,68 @@ def main():
 
     print(
         f"mix={args.max_samples} seq={args.max_seq} epochs={args.epochs} "
-        f"lr={args.lr} rank={args.rank} gpu={os.environ.get('CUDA_VISIBLE_DEVICES')}"
+        f"lr={args.lr} rank={args.rank} save_steps={args.save_steps} "
+        f"gpu={os.environ.get('CUDA_VISIBLE_DEVICES')}"
     )
-    rows = build_mix(args.max_samples, seed=args.seed)
-    print(f"built {len(rows)} chats")
     if args.dry_run:
+        rows = build_mix(args.max_samples, seed=args.seed)
+        print(f"built {len(rows)} chats")
         for row in rows[:2]:
             print("---")
             print(row["messages"][1]["content"][:500])
         return
 
+    import json
     import torch
+    from transformers import TrainerCallback
     from unsloth import FastLanguageModel
     from datasets import Dataset
     from trl import SFTConfig, SFTTrainer
+    from seawen.hub import (
+        get_token,
+        pull_mix,
+        push_adapter,
+        push_checkpoint,
+        push_mix,
+        resolve_resume,
+    )
 
     if not torch.cuda.is_available():
         raise SystemExit("No CUDA GPU. In Kaggle: Settings -> Accelerator -> GPU T4 x2, Internet On.")
+
+    token = get_token()
+    if token:
+        print(f"hub={args.hub_id} checkpoint every {args.save_steps} steps")
+    else:
+        print("no HF token found. Checkpoints stay on local disk only and die with the Kaggle session.")
+
+    out = args.output
+    os.makedirs(out, exist_ok=True)
+    mix_path = os.path.join(out, "mix.jsonl")
+    if token and not os.path.isfile(mix_path):
+        try:
+            pull_mix(token, out, args.hub_id)
+        except Exception as exc:
+            print(f"mix download failed ({exc})")
+
+    saved_texts = None
+    if os.path.isfile(mix_path) and os.path.getsize(mix_path) > 0:
+        saved_texts = []
+        with open(mix_path) as handle:
+            for line in handle:
+                line = line.strip()
+                if line:
+                    saved_texts.append(json.loads(line)["text"])
+        print(f"loaded {len(saved_texts)} saved rows from mix.jsonl")
+    else:
+        print("no saved mix, building a new one")
+
+    resume = None
+    try:
+        resume = resolve_resume(out, token, args.hub_id)
+    except Exception as exc:
+        print(f"resume lookup failed, starting fresh ({exc})")
+        resume = None
 
     major, minor = torch.cuda.get_device_capability()
     bf16 = major >= 8
@@ -99,15 +146,32 @@ def main():
         random_state=args.seed,
     )
 
-    texts = [render_text(tokenizer, row["messages"]) for row in rows]
-    # Drop empties and anything the chat template blew past the seq budget by a lot.
-    texts = [text for text in texts if text and text.strip()]
+    if saved_texts is None:
+        rows = build_mix(args.max_samples, seed=args.seed)
+        texts = [render_text(tokenizer, row["messages"]) for row in rows]
+        texts = [text for text in texts if text and text.strip()]
+        with open(mix_path, "w") as handle:
+            for text in texts:
+                handle.write(json.dumps({"text": text}) + "\n")
+        print(f"wrote {len(texts)} rows to {mix_path}")
+        if token:
+            try:
+                push_mix(token, mix_path, args.hub_id)
+            except Exception as exc:
+                print(f"mix upload failed, training continues ({exc})")
+    else:
+        texts = saved_texts
+    if resume and not texts:
+        raise SystemExit(
+            "A checkpoint exists but mix.jsonl is missing locally and on the hub. "
+            "Refusing to resume onto a newly shuffled dataset. "
+            "Delete the checkpoints on Yashhh999/seawen if you want a fresh run."
+        )
     dataset = Dataset.from_dict({"text": texts})
     print("sample rendered tail:")
     print(texts[0][-400:])
 
     out = args.output
-    os.makedirs(out, exist_ok=True)
     config_kwargs = dict(
         output_dir=out,
         per_device_train_batch_size=args.batch,
@@ -117,7 +181,7 @@ def main():
         learning_rate=args.lr,
         fp16=not bf16,
         bf16=bf16,
-        logging_steps=10,
+        logging_steps=1,
         optim="adamw_8bit",
         weight_decay=0.01,
         lr_scheduler_type="cosine",
@@ -125,7 +189,7 @@ def main():
         max_grad_norm=0.3,
         report_to="none",
         save_strategy="steps",
-        save_steps=100,
+        save_steps=args.save_steps,
         save_total_limit=2,
         dataset_text_field="text",
         max_seq_length=args.max_seq,
@@ -164,9 +228,40 @@ def main():
     except Exception as exc:
         print(f"response-only mask skipped ({exc}). Loss will include the prompt.")
 
-    trainer.train()
+    class HubCheckpointCallback(TrainerCallback):
+        def __init__(self, hf_token: str, repo_id: str):
+            self.hf_token = hf_token
+            self.repo_id = repo_id
+
+        def on_save(self, args, state, control, **kwargs):
+            folder = os.path.join(args.output_dir, f"checkpoint-{state.global_step}")
+            if not os.path.isfile(os.path.join(folder, "trainer_state.json")):
+                print(f"checkpoint-{state.global_step} incomplete, not pushing")
+                return
+            try:
+                push_checkpoint(self.hf_token, folder, state.global_step, self.repo_id)
+            except Exception as exc:
+                print(f"checkpoint-{state.global_step} push failed, training continues ({exc})")
+
+    if token:
+        trainer.add_callback(HubCheckpointCallback(token, args.hub_id))
+
+    try:
+        trainer.train(resume_from_checkpoint=resume)
+    except Exception as exc:
+        text = str(exc).lower()
+        if resume and ("checkpoint" in text or "resume" in text):
+            print(f"resume from {resume} failed ({exc}). Starting at step 0 with the saved mix.")
+            trainer.train(resume_from_checkpoint=None)
+        else:
+            raise
     model.save_pretrained(out)
     tokenizer.save_pretrained(out)
+    if token:
+        try:
+            push_adapter(token, out, args.hub_id)
+        except Exception as exc:
+            print(f"final adapter push failed ({exc})")
     print(f"adapter saved to {out}")
 
 

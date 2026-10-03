@@ -20,6 +20,7 @@ subprocess.check_call(
         "peft",
         "accelerate",
         "bitsandbytes",
+        "huggingface_hub",
     ]
 )
 
