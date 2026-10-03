@@ -1,9 +1,6 @@
-# Run this file's cells in a Kaggle notebook.
-# Settings: Accelerator = GPU T4 x2, Internet = On.
-# The second T4 is unused. Unsloth trains on one GPU, and a 9B bf16 LoRA does not fit.
-
-# %%
+# One cell. Kaggle settings: GPU T4 x2, Internet On.
 import os
+import shutil
 import subprocess
 import sys
 
@@ -25,22 +22,26 @@ subprocess.check_call(
 )
 
 repo = "/kaggle/working/seawen"
-if not os.path.exists(os.path.join(repo, "seawen", "train.py")):
-    subprocess.check_call(["git", "clone", "--depth", "1", "https://github.com/Yashhh999/seawen.git", repo])
+url = "https://github.com/Yashhh999/seawen.git"
+if os.path.isdir(os.path.join(repo, ".git")):
+    subprocess.check_call(["git", "-C", repo, "pull", "--ff-only"])
+else:
+    if os.path.exists(repo):
+        shutil.rmtree(repo)
+    subprocess.check_call(["git", "clone", "--depth", "1", url, repo])
+
 os.chdir(repo)
 sys.path.insert(0, repo)
+for name in list(sys.modules):
+    if name == "seawen" or name.startswith("seawen."):
+        del sys.modules[name]
 
-# 4000 samples is a few hours, not a full 12h quota. Raise SEAWEN_MAX_SAMPLES if the first run looks healthy.
-os.environ.setdefault("SEAWEN_MAX_SAMPLES", "4000")
-os.environ.setdefault("SEAWEN_MAX_SEQ", "2048")
-os.environ.setdefault("SEAWEN_OUTPUT", "/kaggle/working/seawen-adapter")
+os.environ["SEAWEN_MAX_SAMPLES"] = "4000"
+os.environ["SEAWEN_MAX_SEQ"] = "2048"
+os.environ["SEAWEN_SAVE_STEPS"] = "5"
+os.environ["SEAWEN_HUB_ID"] = "Yashhh999/seawen"
+os.environ["SEAWEN_OUTPUT"] = "/kaggle/working/seawen-adapter"
 
 from seawen.train import main
 
 main()
-
-# %%
-# Smoke test after training. Read the prints. Do not treat this as a benchmark score.
-from seawen.eval_smoke import main as eval_main
-
-eval_main()
