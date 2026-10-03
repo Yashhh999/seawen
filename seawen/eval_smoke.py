@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", os.environ.get("SEAWEN_GPU", "0"))
+# Do not pin the GPU at import time. Kaggle has two T4s, and the training
+# process often stays on GPU 0 after a kernel restart.
 
 PROMPTS = [
     ("code", "Write a Python function is_prime(n) for n >= 0. Include assert is_prime(29) and assert not is_prime(1)."),
@@ -23,6 +25,36 @@ PROMPTS = [
 ]
 
 
+def _pick_gpu() -> None:
+    if os.environ.get("SEAWEN_GPU"):
+        os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["SEAWEN_GPU"]
+        return
+    try:
+        raw = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=index,memory.free", "--format=csv,noheader,nounits"],
+            text=True,
+        )
+    except Exception as exc:
+        print(f"nvidia-smi failed ({exc})")
+        return
+    best_index, best_free = None, -1
+    for line in raw.strip().splitlines():
+        index, free = [part.strip() for part in line.split(",")]
+        free_mb = int(free)
+        print(f"GPU {index}: {free_mb / 1024:.1f} GB free")
+        if free_mb > best_free:
+            best_index, best_free = index, free_mb
+    if best_index is None:
+        return
+    if best_free < 8 * 1024:
+        raise RuntimeError(
+            "Neither T4 has 8 GB free. Stop the Kaggle session with the power button, "
+            "start it again, and run only this cell. Restarting the kernel does not release the GPU."
+        )
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(best_index)
+    print(f"using GPU {best_index}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--adapter", default=os.environ.get("SEAWEN_OUTPUT", "Yashhh999/seawen"))
@@ -30,19 +62,15 @@ def main():
     parser.add_argument("--max-new", type=int, default=400)
     args = parser.parse_known_args()[0]
 
+    _pick_gpu()
     import unsloth  # before peft / transformers
     import torch
     from unsloth import FastLanguageModel
 
     if not torch.cuda.is_available():
-        raise RuntimeError("No GPU. Restart the Kaggle session with the T4 accelerator on, then run this cell alone.")
+        raise RuntimeError("No GPU. Turn the T4 accelerator on, then run this cell alone.")
     free, total = torch.cuda.mem_get_info()
-    print(f"GPU free {free / 1e9:.1f} / {total / 1e9:.1f} GB")
-    if free < 12e9:
-        raise RuntimeError(
-            "The training model is still on the GPU, so a second 9B does not fit. "
-            "Restart the session, do not run the training cell, and run only this eval cell."
-        )
+    print(f"visible GPU free {free / 1e9:.1f} / {total / 1e9:.1f} GB")
 
     # One load. The adapter repo points at Qwen/Qwen3.5-9B. Loading the base
     # and then PeftModel tries to place a second copy and trips the 4-bit offload error.
