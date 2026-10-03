@@ -14,6 +14,7 @@ from pathlib import Path
 HUB_ID = os.environ.get("SEAWEN_HUB_ID", "Yashhh999/seawen")
 ADAPTER_FILES = ("adapter_model.safetensors", "adapter_model.bin")
 SECRET_NAMES = (
+    "HF_HUB_TOKEN",
     "HF_TOKEN",
     "HUGGINGFACE_TOKEN",
     "HUGGING_FACE_HUB_TOKEN",
@@ -23,11 +24,16 @@ SECRET_NAMES = (
 
 
 def get_token() -> str | None:
+    for key, value in os.environ.items():
+        if not value or not value.startswith("hf_"):
+            continue
+        upper = key.upper()
+        if "HF" in upper or "HUGG" in upper or upper in {"TOKEN", "HUGGINGFACE"}:
+            return value.strip()
     for key in SECRET_NAMES:
         value = os.environ.get(key)
-        if value:
-            os.environ["HF_TOKEN"] = value
-            return value
+        if value and value.strip():
+            return value.strip()
     try:
         from kaggle_secrets import UserSecretsClient
 
@@ -39,11 +45,25 @@ def get_token() -> str | None:
             value = client.get_secret(name)
         except Exception:
             continue
-        if value:
-            os.environ["HF_TOKEN"] = value
+        if value and str(value).strip():
             print(f"using Kaggle secret {name}")
-            return value
+            return str(value).strip()
     return None
+
+
+def activate_token(token: str) -> None:
+    """Set every place Hugging Face looks, before the first download."""
+    os.environ["HF_TOKEN"] = token
+    os.environ["HUGGING_FACE_HUB_TOKEN"] = token
+    os.environ["HUGGINGFACE_HUB_TOKEN"] = token
+    path = Path.home() / ".cache" / "huggingface" / "token"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(token)
+    os.chmod(path, 0o600)
+    from huggingface_hub import login
+
+    login(token=token, add_to_git_credential=False)
+    print(f"HF auth ok ({token[:3]}…{token[-4:]})")
 
 
 def _step(name: str) -> int | None:

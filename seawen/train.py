@@ -57,6 +57,16 @@ def _headers(tokenizer) -> tuple[str, str]:
 
 def main():
     args = parse_args()
+    from seawen.hub import activate_token, get_token
+
+    token = get_token()
+    if not token:
+        raise SystemExit(
+            "No Hugging Face token. In Kaggle: Add-ons -> Secrets, "
+            "label it HF_TOKEN, attach it to this notebook, then run again."
+        )
+    activate_token(token)
+
     from seawen.data import build_mix, render_text
 
     print(
@@ -79,7 +89,6 @@ def main():
     from datasets import Dataset
     from trl import SFTConfig, SFTTrainer
     from seawen.hub import (
-        get_token,
         pull_mix,
         push_adapter,
         push_checkpoint,
@@ -90,11 +99,7 @@ def main():
     if not torch.cuda.is_available():
         raise SystemExit("No CUDA GPU. In Kaggle: Settings -> Accelerator -> GPU T4 x2, Internet On.")
 
-    token = get_token()
-    if token:
-        print(f"hub={args.hub_id} checkpoint every {args.save_steps} steps")
-    else:
-        print("no HF token found. Checkpoints stay on local disk only and die with the Kaggle session.")
+    print(f"hub={args.hub_id} checkpoint every {args.save_steps} steps")
 
     out = args.output
     os.makedirs(out, exist_ok=True)
