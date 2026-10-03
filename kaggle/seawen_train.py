@@ -25,7 +25,7 @@ subprocess.check_call(
 
 repo = "/kaggle/working/seawen"
 if not os.path.exists(os.path.join(repo, "seawen", "train.py")):
-    subprocess.check_call(["git", "clone", "--depth", "1", "https://github.com/yashhh999/seawen.git", repo])
+    subprocess.check_call(["git", "clone", "--depth", "1", "https://github.com/Yashhh999/seawen.git", repo])
 os.chdir(repo)
 sys.path.insert(0, repo)
 

@@ -20,7 +20,7 @@ Default sequence length is **2048**, not 4096. A 9B 4-bit run at 4096 OOMs on a 
 ## Kaggle
 
 1. New Notebook. Settings: **GPU T4 x2**, **Internet On**.
-2. Paste the cells from [kaggle/seawen_train.py](kaggle/seawen_train.py), or upload this repo and run them.
+2. Upload [kaggle/Seawen-Qwen3.5-9B.ipynb](kaggle/Seawen-Qwen3.5-9B.ipynb), or paste the two code cells. It clones this repo and trains.
 3. When it finishes, the adapter is in `/kaggle/working/seawen-adapter`. Download that folder from the notebook output.
 
 First launch compiles Qwen3.5's Mamba kernels and looks hung. That is one-time.
