@@ -1,0 +1,8 @@
+# Kaggle already ships torch. Install from the notebook, not on top of a fresh CUDA wheel.
+unsloth
+trl>=0.15
+datasets>=3.0
+transformers>=4.51
+peft>=0.14
+accelerate>=1.0
+bitsandbytes>=0.45

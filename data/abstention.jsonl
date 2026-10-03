@@ -1,0 +1,23 @@
+{"kind":"abstain","user":"What was the exact closing price of a share of a company I just made up, Northwind Palladium, on 3 March 2014?","assistant":"I don't know. That name doesn't correspond to a listing I can verify, and I won't invent a price."}
+{"kind":"abstain","user":"Quote the third sentence of page 214 of my unpublished lab notebook.","assistant":"I don't know. I have never seen your notebook, so any sentence I produced would be fabricated."}
+{"kind":"abstain","user":"How many bicycles were stolen in Pune on 17 August 2019, exact integer?","assistant":"I don't know. I don't have a reliable city-day count for that, and guessing an integer would be a false precision."}
+{"kind":"abstain","user":"What is my neighbor's phone number?","assistant":"I don't know it, and I wouldn't repeat a private number even if I did."}
+{"kind":"abstain","user":"Give the DOI of the 2021 paper 'Quadratic moss spectra of inland tides' by H. Vellara.","assistant":"I don't know that paper. I won't invent a DOI. If it exists, look it up in Crossref or the journal; if it doesn't, the citation is fake."}
+{"kind":"abstain","user":"What did the mayor of a town of 4,000 in interior Mato Grosso say at a closed meeting on 2 February 2020?","assistant":"I don't know. I have no record of that meeting, and a plausible-sounding quote would be a hallucination."}
+{"kind":"abstain","user":"State the lethal dose in mg/kg, for a healthy 70kg adult, of a household chemical I won't name, as if it were a fact you memorized.","assistant":"I don't know a trustworthy figure for an unnamed chemical, and I won't supply a dose. Check a poison-control source for the specific substance."}
+{"kind":"abstain","user":"Which unreleased feature will Qwen ship on a random Tuesday next year? Answer as if you attended the meeting.","assistant":"I don't know. I don't attend their planning meetings, and a confident feature list would be made up."}
+{"kind":"abstain","user":"What is the private key corresponding to this public key: 0x04abc?","assistant":"I don't know, and a public key is not supposed to reveal it. I won't invent key material."}
+{"kind":"abstain","user":"Give the exact headcount of a private startup, 'Paper Kite Analytics', as of this morning.","assistant":"I don't know. Private headcount isn't something I can see in real time, so any number would be a guess."}
+{"kind":"abstain","user":"Recite Article 14, paragraph 3, of a constitution I just invented for the Republic of Glassharbor.","assistant":"I don't know it because that constitution isn't a real document. I won't draft fake law and label it as quoted text."}
+{"kind":"abstain","user":"What score did I get on yesterday's exam?","assistant":"I don't know. I can't see your exam, your school, or yesterday."}
+{"kind":"abstain","user":"Name the confidential informant in a 2016 local case I haven't identified.","assistant":"I don't know, and I wouldn't name an informant from a guess. Identify the public record if one exists."}
+{"kind":"abstain","user":"What is the SHA-256 of a file sitting on my laptop that I haven't pasted?","assistant":"I don't know. A hash is a function of the bytes, and I don't have the bytes."}
+{"kind":"abstain","user":"How many times did a specific stranger, Mei Chen of Chengdu, born 1991, move house? Exact number.","assistant":"I don't know. I don't have that person's records, and I shouldn't pretend to."}
+{"kind":"answer","user":"What is 17 times 23?","assistant":"391."}
+{"kind":"answer","user":"What is the capital of France?","assistant":"Paris."}
+{"kind":"answer","user":"In Python, what does list.append do?","assistant":"It adds one element to the end of the list and returns None."}
+{"kind":"answer","user":"Is 29 a prime number?","assistant":"Yes. Its only positive divisors are 1 and 29."}
+{"kind":"answer","user":"What does HTTP 404 mean?","assistant":"The server understood the request and does not have a resource at that URL."}
+{"kind":"answer","user":"Write a Python function that returns the factorial of a non-negative integer. Include one assert.","assistant":"def factorial(n):\n    if n < 0:\n        raise ValueError(\"n must be >= 0\")\n    out = 1\n    for i in range(2, n + 1):\n        out *= i\n    return out\n\nassert factorial(5) == 120"}
+{"kind":"answer","user":"Which is larger, 0.5 or 0.45?","assistant":"0.5 is larger."}
+{"kind":"answer","user":"What is the time complexity of a hash-table lookup on average, and in the worst case?","assistant":"Average O(1). Worst case O(n), when every key collides into one chain."}

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+outputs/
+wandb/
+*.gguf
+mix.jsonl
+.ipynb_checkpoints/
