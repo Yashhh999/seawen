@@ -35,11 +35,11 @@ def main():
     from unsloth import FastLanguageModel
 
     if not torch.cuda.is_available():
-        raise SystemExit("No GPU. Restart the Kaggle session with the T4 accelerator on, then run this cell alone.")
+        raise RuntimeError("No GPU. Restart the Kaggle session with the T4 accelerator on, then run this cell alone.")
     free, total = torch.cuda.mem_get_info()
     print(f"GPU free {free / 1e9:.1f} / {total / 1e9:.1f} GB")
     if free < 12e9:
-        raise SystemExit(
+        raise RuntimeError(
             "The training model is still on the GPU, so a second 9B does not fit. "
             "Restart the session, do not run the training cell, and run only this eval cell."
         )
