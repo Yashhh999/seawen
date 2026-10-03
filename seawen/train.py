@@ -57,6 +57,7 @@ def _headers(tokenizer) -> tuple[str, str]:
 
 def main():
     args = parse_args()
+    import unsloth  # before transformers / peft / huggingface_hub
     from seawen.hub import activate_token, get_token
 
     token = get_token()
@@ -84,8 +85,8 @@ def main():
 
     import json
     import torch
-    from transformers import TrainerCallback
     from unsloth import FastLanguageModel
+    from transformers import TrainerCallback
     from datasets import Dataset
     from trl import SFTConfig, SFTTrainer
     from seawen.hub import (

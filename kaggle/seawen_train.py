@@ -50,6 +50,7 @@ subprocess.check_call(
     ]
 )
 
+import unsloth  # before huggingface_hub, which pulls transformers
 from huggingface_hub import login
 login(token=token, add_to_git_credential=False)
 print(f"HF auth ok ({token[:3]}…{token[-4:]})")
