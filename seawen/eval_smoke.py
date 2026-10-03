@@ -25,22 +25,32 @@ PROMPTS = [
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter", default=os.environ.get("SEAWEN_OUTPUT", "/kaggle/working/seawen-adapter"))
+    parser.add_argument("--adapter", default=os.environ.get("SEAWEN_OUTPUT", "Yashhh999/seawen"))
     parser.add_argument("--base", default=os.environ.get("SEAWEN_MODEL", "Qwen/Qwen3.5-9B"))
     parser.add_argument("--max-new", type=int, default=400)
     args = parser.parse_known_args()[0]
 
+    import unsloth  # before peft / transformers
     import torch
-    from peft import PeftModel
     from unsloth import FastLanguageModel
 
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=args.base,
-        max_seq_length=2048,
-        dtype=None,
-        load_in_4bit=True,
-    )
-    model = PeftModel.from_pretrained(model, args.adapter)
+    if not torch.cuda.is_available():
+        raise SystemExit("No GPU. Restart the Kaggle session with the T4 accelerator on, then run this cell alone.")
+    free, total = torch.cuda.mem_get_info()
+    print(f"GPU free {free / 1e9:.1f} / {total / 1e9:.1f} GB")
+    if free < 12e9:
+        raise SystemExit(
+            "The training model is still on the GPU, so a second 9B does not fit. "
+            "Restart the session, do not run the training cell, and run only this eval cell."
+        )
+
+    # One load. The adapter repo points at Qwen/Qwen3.5-9B. Loading the base
+    # and then PeftModel tries to place a second copy and trips the 4-bit offload error.
+    kwargs = dict(max_seq_length=2048, dtype=None, load_in_4bit=True)
+    try:
+        model, tokenizer = FastLanguageModel.from_pretrained(model_name=args.adapter, text_only=True, **kwargs)
+    except TypeError:
+        model, tokenizer = FastLanguageModel.from_pretrained(model_name=args.adapter, **kwargs)
     FastLanguageModel.for_inference(model)
 
     for kind, prompt in PROMPTS:
